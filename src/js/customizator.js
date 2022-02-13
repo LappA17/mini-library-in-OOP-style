@@ -1,90 +1,161 @@
 export default class Customizator {
     constructor() {
-        /* Переносим this.btnBlock и this.colorPicker в конструктор с рендера. ТАКИМ ОБРАЗОМ ДВА ЭТИ ЭЛЕМЕНТА БУДУТ 
-СОЗДАВАТЬСЯ ТОЛЬКО ПРИ СОЗДАНИИ НАШЕГО КЛАССА, ТЕ ОНИ УЖЕ БУДУТ НАМ ДОСТУПНЫ. Теперь в каждом отдельном экземпляре нашего костомизатора
-еще ДО ТОГО КАК МЫ ВЫЗОВИМ МЕТОД РЕНДЕР, ОНИ УЖЕ БУДУТ СОЗДАНЫ */
-        // Будем создавать определенные элементы что бы разместить их на странице
-        this.btnBlock = document.createElement('div');/* Когда мы будем создавать новый экземплаяр этого класса кастомизатор,
-у нас будет создаваться новый элемент, на странице. Те класс - это шаблон для того что бы мы могли конструировать отдельные объекты.
-Те если мне на сайте нужно сделать несколько панелей то я по этому шаблону сделал бы еще два отдельные. По факту это были бы разные
-объекты но шаблон будет один от customizator */
-        this.colorPicker = document.createElement('input'); // инпут с выбором цвета. В html 5 появился инпут с вобором цвета(даже календарь)
+        this.btnBlock = document.createElement('div');
+        this.colorPicker = document.createElement('input');
 
-        // Из-за того что this.btnBlock и this.colorPicker больше не в рендере мы можем добавить фционал
+        // Создадим возможность пользователю скидывать настройки до дефолтных
+        this.clear = document.createElement('div');
+
+        //Займем localStorage, что бы при повторном заходе на наш сайт, сохарнялись настройки
+        this.scale = localStorage.getItem('scale') || 1; /* получаем значение свойства scale c помощью localStorage + если в 
+        localStorage.getItem('scale') будет false то 1 будет стоять как значение по умолчанию как размер шрифта !  */
+
+        this.color = localStorage.getItem('color') || "#e5ffbc"; // #e5ffbc - будет стоять по умолчанию
+
         this.btnBlock.addEventListener("click", (e) => this.onScaleChange(e));
 
-        // Реализуем выбор цвета
-        this.colorPicker.addEventListener("input", (e) => this.onColorChange(e)); /* событие инпут что бы отслеживать изменения нашего инпута и потом производить определеные действия! */
+        this.colorPicker.addEventListener("input", (e) => this.onColorChange(e));
+
+        this.clear.addEventListener("click", () => this.reset());
     }
 
-    onScaleChange(e) { /* Нужно что бы у всеъ текстовых тегов(к котормы мы обращаемся как node.parentNode, потому что мы получаем ноду а у нее нет тега) менялся fontSize после кликов на кнопку */
-        let scale; // Когда я буду изменять маштаб мне понадобиться переменная которая будет хранить это значение
+    onScaleChange(e) {
+        // let scale; - это переменная уже не нужна потому что мы создали свойство this.scale и у нее есть значение из локалсторедж
         const body = document.querySelector('body');
 
-        if (e.target.value) { // e.target.value - обращаемся к тому значению scaleInputS и scaleInputM которое мы туда поместили
-            scale = +e.target.value.replace(/x/g, ""); /* нам нужно получить ЗНАЧЕНИЕ этого value. Там строка, а нам нужно число, по этому ставим сначала
-плюсик, а что бы избавиться от X используем регулярное вырожение  */
+        if (e) { /* Здесь вместо e.target.value оставим просто объект события e. Потому что в будущем нужно будет запустить метод,
+который запустит инициализацию нашего проекта(тоесть установка всех дата атрибутов, всех фонтсайзов) на основе значение из нашего
+локалстореджа. И когда мы будем запускать такой метод у нас не будет евента просто не будет. И если мы вдруг не передали объект события, тоесть он не вызвался в таком формате (e) => this.onScaleChange(e) то мы эту часть кода просто опустим 
+if (e) {
+    scale = +e.target.value.replace(/x/g, "");
+} 
+    Если же этот метод произошел во время СОБЫТИЯ то мы будем в this.scale = +e.target.value.replace(/x/g, "") */
+            this.scale = +e.target.value.replace(/x/g, "");
         }
 
-        // Теперь нужно перебрать все элементы внутри body. Нам понадобиться РЕКУРСИЯ
-        function recursy(element) { // он принимает в себя какой то элемент
-            element.childNodes.forEach(node => { // мы обращаемся ко всем дочернем элементам этого элеемента и так как это массив - перебераем его
+/* У нас фцункция recursy теряет значение this.scale потому что она создается как самя обычная фция и КОНТЕКТ ВЫЗОВА ОНА ТЕРЯЕТ !!!
+   По этому создаем как стрелочную фцию . Было function recursy(element) {*/
+        const recursy = (element) => {
+            element.childNodes.forEach(node => {
                 if (node.nodeName === '#text' && node.nodeValue.replace(/\s+/g, "").length > 0) { 
-/* Впервую очередь в ноде нам нужно получить все текстовые узлы. После того как мы найдем текст, нам нужно обратиться к родителю 
-и узнать а какой fontsize у этого текста. И потом мы этот параметр просто умножаем на scale.
-#text - таким образом мы определяем только текстовые узлы
-&& node.nodeValue.replace(/\s+/g, "") - так же нам нужны все НЕ ПУСТЫЕ узлы. Но так как в нодах есть пробелы нам нужно заменить их. 
-При помощи s мы берем все пробелы и мы их заменяем на пустую строку. Потом сравниваем что сиволов там больше чем 0*/
 
-                    if (!node.parentNode.getAttribute('data-fz')) { /* Если у нашего элемента который был найден, сейчас нет этого атрибута, то мы будем выполнят
-инициализацию. Те мы будем выполнять всю ту опперацию что ниже по увелиению шрифта, но при этом мы запишем БАЗОВОЕ ЗНАЧЕНИЕ.
-    И теперь когда мы получили базовое значение, мы говорим что если этого атрибута не существует то код идет дальше, НО ЕСЛИ ЭТОТ АТРИБУТ УЖЕ СУЩУСТВУЕТ ЗНАЧЕТ ПОЛЬЗОВАТЕЛЬ УЖЕ МЕНЯЛ НАШ МАШТАБ !!! */
+                    if (!node.parentNode.getAttribute('data-fz')) { 
 
                     let value = window.getComputedStyle(node.parentNode, null).fontSize;
-/* создаем переменную которая будет только внутри цикла. Обращаемся к странице и у нее есть метод который позволяет получить все стили
-которые были применены к элементу, а во внутрь передаем тот элемент стиль которого мы хотим узнать. И так как мы получили все стили
-нам необходимо вытащить только один который нас действительно интересует = fontSize. Так мы получим размер щрифта каждого элемента,
-который нас интересует */
+                    node.parentNode.setAttribute('data-fz', +value.replace(/px/g, "")); 
+                    node.parentNode.style.fontSize = node.parentNode.getAttribute('data-fz') * this.scale + "px"; 
+                    /*Еще раз напомню что свойсвто this.scale приходит из локалстореджа, а если там ничего не передано то по дефолту стоит 1  */
 
-                    node.parentNode.setAttribute('data-fz', +value.replace(/px/g, "")); /* Мы установили значение атрибуты для тега нужном нам ноды в +value.replace(/px/g, ""). Теперь когда у меня будет первый раз инициализация изменения размера этого шрифта у меня будет так же создаваться ДАТА АТРИБУТ и в нем будет храниться БАЗОВОЕ ЗНАЧЕНИЕ. 
-                        И что бы получить к нему доступ мы прописывам node.nodeParent.getAttribute('data-fc') !!! */
+                    } else { 
+                        node.parentNode.style.fontSize = node.parentNode.getAttribute('data-fz') * this.scale + "px"; 
+                    } 
 
-                    //Теперь будет менять значение тех элементов что мы получили
-                    node.parentNode.style.fontSize = node.parentNode.getAttribute('data-fz') * scale + "px";
-/*  Мы обращаемся к parentNode потому что у обычной ноды ничего нет что есть у обычного тега, а инлайн стили только к тегам применяются. 
-    Так же нужно обрезать px, потому что фонтСайз который мы получаем содержит пиксели в строке. И это должно быть числом пэтому + 
-    Умножаем на скейл и так как мы устанавливаем инлайн стиль нам нужно подставить px что бы было понимание в чем мы это измеряем.
-    
-    И теперь после каждого нажатия на 1.5px у меня постояно увеличивается размер шрифта, но пока что при нажатие на 1 обратно не возвращается !*/
-                    } else { // МАШТАБ УЖЕ МЕНЯЛСЯ !!! ПОТОМУ ЧТО АТРИБУТА УЖЕ ЕСТЬ
-                        node.parentNode.style.fontSize = node.parentNode.getAttribute('data-fz') * scale + "px"; /* Мы берем значение из дата атрибута(базовое значение) и его изменяем на тот масштаб который у нас был кликнут */
-                    } /* Теперь после клика на 1.5 оно не будет до бесконечности умножаться, а после клика на 1 возвращается в базу */
-
-                } else { // если условие не выполнилось, фция дальше запускат сама себя
-                    recursy(node); // node - каждый отдельный элемент внутри элемента
-                }/* Тут ничего тяжелого нет, мы начинаем от бади, к примеру у нас есть контейнер, наш скрипт идет дальше, он проходится
-по всем дочернем элементам контейнера, потом по дочернем элементам того что в контейнере и так далее пока не найдет нужный нам элементы */
+                } else { 
+                    recursy(node); 
+                }
             });
         }
 
         recursy(body);
+
+        localStorage.setItem('scale', this.scale);
     }
 
     onColorChange(e) {
         const body = document.querySelector('body');
-        body.style.backgroundColor = e.target.value; // получаем значение объекта события на котором оно возникло 
-        // console.log(e.target.value); можно вывести в консоль и оно будет много раз меняться после выбора цвета, а именно код 
+        body.style.backgroundColor = e.target.value;
+        localStorage.setItem('color', e.target.value); /* color - ключ, e.target.value - значение ключа. Теперь значение this.color
+лежит значение прям из локалстореджа */ 
     }
 
+    // Напишем метод который будет устанавливать backgroundColor для тега бади только когда мы заходим на нашу страницу когда у нас рендерится наша новая панелька
+    setBgColor() {
+        const body = document.querySelector('body');
+        body.style.backgroundColor = this.color;
+        this.colorPicker.value = this.color;
+    }
+
+    // Для того что бы мы новые сталистичиские правила могли подключать к той странице на которой будет работать наш скрипт
+    injectStyle() {
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .panel {
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                position: fixed;
+                top: 10px;
+                right: 0;
+                border: 1px solid rgba(0,0,0, .2);
+                box-shadow: 0 0 20px rgba(0,0,0, .5);
+                width: 300px;
+                height: 60px;
+                background-color: #fff;
+
+            }
+
+            .scale {
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                width: 100px;
+                height: 40px;
+            }
+
+            .scale_btn {
+                display: block;
+                width: 40px;
+                height: 40px;
+                border: 1px solid rgba(0,0,0, .2);
+                border-radius: 4px;
+                font-size: 18px;
+            }
+
+            .color {
+                width: 40px;
+                height: 40px;
+            }
+
+            .clear {
+                font-size: 20px;
+                cursor: pointer;
+            }
+        `;
+         /* Дело в том что мы сюда должны вставлять чистый css, а не sass. По этому вырезаем &_btn которая находилось в scale и прописываем .scale_btn
+            Clear - стили для крестика !  */
+
+         document.querySelector('head').appendChild(style); /* В head апендим style. И теперь когда наш скрипт будет подключаться к 
+нашей странице он будет автоматически задавать сам для себя стилистические правила, что бы пользователю было приятно использовать
+фционал.
+    Таким образом наш скрипт не зависит от проекта к которому он подлкючается ! */
+    }
+
+    //Этот метод будет сбрасывать все значение в локалстореджи до дефолта
+    reset() {
+        localStorage.clear(); // clear - это метод локалстореджа по очистке
+        
+        /*Раз уж мы очистили все данные, мы должны помнить про все те свойства которые находятся внутри нашего объекта + после очистки
+данных нам нужно изменить все это на странице что бы пользователь увидел изменения */
+        this.scale = 1;
+        this.color = "#e5ffbc";
+        this.setBgColor();
+        this.onScaleChange();
+    } /* Все, теперь при клике на крестик весь локелсторедж очищается и подставляются дефолтные значение 1 и "#e5ffbc" */
+
     render() {
-        /* Переменные можно использовать только внутри методе рендер, но если я хочу использовать свойство
-внутри всего класса, то мне нужно записать именно свойство, те this.btnBlock через this !!! */
+        this.injectStyle();
+        this.setBgColor(); // Теперь каждый раз как я захожу на страницу будет подставляться значение из локалСтореджа
+        this.onScaleChange(); /* Во внутрь ничего не передаем, соотвественно это условие проходит мимо if (e) {
+            scale = +e.target.value.replace(/x/g, "");
+        } */
 
         let scaleInputS = document.createElement('input'),
             scaleInputM = document.createElement('input'),
             panel = document.createElement('div');
 
-        panel.append(this.btnBlock, this.colorPicker);
+        panel.append(this.btnBlock, this.colorPicker, this.clear); // апендим this.clear на страницу
+        this.clear.innerHTML = `&times`; // &times - это спецсимвол КРЕСТИК
+        this.clear.classList.add('clear');
 
         scaleInputS.classList.add('scale_btn');
         scaleInputM.classList.add('scale_btn');
@@ -93,15 +164,19 @@ export default class Customizator {
 
         scaleInputS.setAttribute('type', 'button');
         scaleInputM.setAttribute('type', 'button');
-        scaleInputS.setAttribute('value', '1x'); // по дефолту в value будет 1x (стандартный маштаб)
-        scaleInputM.setAttribute('value', '1.5x'); // тот маштаб на который мы будем увеличивтаь или уменьшать текст на странице
-        this.colorPicker.setAttribute('type', 'color'); // таким образом можно будет вызывать меню с выбором цвета
-        this.colorPicker.setAttribute('value', '#e5ffbc'); // '#e5ffbc' - это дефолтное значение
+        scaleInputS.setAttribute('value', '1x'); 
+        scaleInputM.setAttribute('value', '1.5x'); 
+        this.colorPicker.setAttribute('type', 'color'); 
+        this.colorPicker.setAttribute('value', '#e5ffbc'); 
 
         this.btnBlock.append(scaleInputS, scaleInputM);
 
         panel.classList.add('panel');
 
-        document.querySelector('body').append(panel); // помещаем все это дело на страницу. document.querySelector('body') это мы ищем элемент на странице куда это нужно все поместить
+        document.querySelector('body').append(panel); 
     }
 }
+
+/* ВАЖНО! Во-первых: мы все это делаем внутри одного объекта, и уже его экземпляр загружаем в main.js. У нас есть класс при помощи которого создаются новые потомки при помощи опператора new.
+          Во-вторых: все эти действия можно определять только к определеным тегам, определеным блокам, текста, и так далее, не обязательно на весь body или только на #text . Те к заголвкам, параграфам, к классам и тд, тоже самое с цветом
+Теперь в конце пишу gulp prod*/
